@@ -9,24 +9,24 @@ export default function TopBar() {
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             placeholder="Search tickets, macros, commands…"
-            className="input-base pl-9 h-9 py-0 font-mono text-[13px]"
-          />
+            className="input-base pl-9 h-9 py-0 font-mono text-[13px]" />
+          
         </div>
       </div>
 
       <div className="flex items-center gap-2">
         <button
           onClick={() => toast.success("Reconnected to Discord gateway")}
-          className="btn-secondary h-9 py-0"
-        >
+          className="btn-secondary h-9 py-0">
+          
           <Plug className="w-4 h-4" />
           <span className="hidden sm:inline">Reconnect</span>
         </button>
         <button
           onClick={() => toast("3 unread ticket events")}
           className="btn-ghost h-9 py-0 relative"
-          aria-label="Notifications"
-        >
+          aria-label="Notifications">
+          
           <Bell className="w-[18px] h-[18px]" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
         </button>
@@ -35,11 +35,11 @@ export default function TopBar() {
             AH
           </div>
           <div className="hidden md:block leading-tight">
-            <div className="text-[13px] font-medium">AHK Haven</div>
+            <div className="text-[13px] font-medium">Admin</div>
             <div className="text-[11px] text-muted-foreground font-mono">owner</div>
           </div>
         </div>
       </div>
-    </header>
-  );
+    </header>);
+
 }
