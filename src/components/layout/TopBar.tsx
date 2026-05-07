@@ -32,7 +32,7 @@ export default function TopBar() {
         </button>
         <div className="flex items-center gap-2 pl-3 ml-1 border-l border-border h-9">
           <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/40 to-accent/40 border border-border flex items-center justify-center text-xs font-mono font-semibold">
-            AH
+
           </div>
           <div className="hidden md:block leading-tight">
             <div className="text-[13px] font-medium">Admin</div>
