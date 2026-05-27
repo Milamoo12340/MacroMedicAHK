@@ -1,8 +1,27 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Bot, UserCircle2, Shield, ImageIcon, ArrowLeft, CheckCircle2 } from "lucide-react";
+import {
+  Send,
+  Bot,
+  UserCircle2,
+  Shield,
+  Image as ImageIcon,
+  ArrowLeft,
+  CheckCircle2,
+} from "lucide-react";
+import { useStore, StorageKeys } from "@/lib/storage";
 import { quickFixes } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import {
+  generateAIResponse,
+  DEFAULT_AI_CONFIG,
+} from "@/lib/ai";
+import type {
+  AIConfig,
+  KnowledgeFile,
+  TrainedResponse,
+  BotConfig,
+} from "@/types";
 
 interface Msg {
   id: string;
@@ -10,23 +29,21 @@ interface Msg {
   content: string;
 }
 
-const AI_FALLBACK =
-  "I don't see that issue in the knowledge base yet. Can you share: (1) macro name, (2) Windows version, (3) any error text? Or run /human to bring in a staff member.";
-
-const CANNED: Record<string, string> = {
-  launch:
-    "Looks like a launch issue. Try: right-click `.ahk` → Run as administrator. Also make sure AutoHotkey v2 (NOT v1) is installed from autohotkey.com. Still stuck?",
-  resolution:
-    "Your coords are probably off because your screen isn't 1920×1080. Open `settings.ini`, set `AutoScale=1`, save, relaunch. Reply `done` when ready to test.",
-  admin:
-    "Windows blocks input simulation without admin rights. Right-click the macro → Properties → Compatibility tab → check 'Run this program as administrator' → Apply.",
-  position:
-    "Most macros need your character at a known starting zone. Check the macro's README for the spawn point. Teleport there, face north, then relaunch.",
-};
-
 export default function TicketPreview() {
   const navigate = useNavigate();
-  const [started, setStarted] = useState(false);
+  const [aiConfig] = useStore<AIConfig>(StorageKeys.aiConfig, DEFAULT_AI_CONFIG);
+  const [files] = useStore<KnowledgeFile[]>(StorageKeys.knowledgeFiles, []);
+  const [trained] = useStore<TrainedResponse[]>(StorageKeys.trainedResponses, []);
+  const [botConfig] = useStore<BotConfig>(StorageKeys.botConfig, {
+    tone: "Friendly debugger",
+    escalateKeyword: "/human",
+    staffRolePing: "@TicketHelpers",
+    quickFixFirst: true,
+    autoTranslate: false,
+    rateLimit: 20,
+  });
+
+  const [started, setStarted] = useState(!botConfig.quickFixFirst);
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: "w",
@@ -37,36 +54,55 @@ export default function TicketPreview() {
   ]);
   const [input, setInput] = useState("");
   const [escalated, setEscalated] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const userMsg: Msg = { id: `u-${Date.now()}`, author: "user", content: text };
     const lower = text.toLowerCase();
+    const escapeKey = botConfig.escalateKeyword.toLowerCase();
 
-    if (lower.includes("/human") || lower.includes("/escalate")) {
+    if (lower.includes(escapeKey) || lower.includes("/human") || lower.includes("/escalate")) {
       setMessages((m) => [
         ...m,
         userMsg,
-        { id: `a-${Date.now()}`, author: "ai", content: "Got it — pinging staff now. A human will join shortly." },
+        {
+          id: `a-${Date.now()}`,
+          author: "ai",
+          content: `Got it — pinging ${botConfig.staffRolePing}. A human will join shortly.`,
+        },
       ]);
       setEscalated(true);
       return;
     }
 
-    let reply = AI_FALLBACK;
-    if (/launch|open|won.?t start|nothing happens/.test(lower)) reply = CANNED.launch;
-    else if (/resolution|ultrawide|1440|2560|scale|wrong spot|miss/.test(lower)) reply = CANNED.resolution;
-    else if (/admin|permission|blocked|elevate/.test(lower)) reply = CANNED.admin;
-    else if (/position|spawn|location|zone|character/.test(lower)) reply = CANNED.position;
-
     setMessages((m) => [...m, userMsg]);
-    setTimeout(() => {
-      setMessages((m) => [...m, { id: `a-${Date.now()}`, author: "ai", content: reply }]);
-    }, 600);
+    setBusy(true);
+
+    const history = messages
+      .filter((m) => m.id !== "w")
+      .map((m) => ({
+        role: (m.author === "ai" ? "assistant" : "user") as "user" | "assistant",
+        content: m.content,
+      }));
+
+    const res = await generateAIResponse({
+      message: text,
+      history,
+      config: aiConfig,
+      knowledgeFiles: files,
+      trainedResponses: trained,
+    });
+
+    setBusy(false);
+    setMessages((m) => [
+      ...m,
+      { id: `a-${Date.now()}`, author: "ai", content: res.content },
+    ]);
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || busy) return;
     send(input.trim());
     setInput("");
   };
@@ -80,23 +116,24 @@ export default function TicketPreview() {
         </button>
 
         <div className="card-surface overflow-hidden">
-          {/* Header */}
           <div className="p-5 border-b border-border flex items-center gap-3 bg-[hsl(var(--sidebar-background))]">
             <div className="w-10 h-10 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center">
               <Bot className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <div className="font-semibold">MacroMedic</div>
               <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary status-dot" />
-                online • reading your ticket
+                online • {aiConfig.provider} / {aiConfig.model}
               </div>
             </div>
           </div>
 
           {!started ? (
             <div className="p-6 space-y-5">
-              <div className="text-[11px] font-mono tracking-[0.2em] uppercase text-primary">QUICK-FIX CHECKLIST</div>
+              <div className="text-[11px] font-mono tracking-[0.2em] uppercase text-primary">
+                QUICK-FIX CHECKLIST
+              </div>
               <div className="text-sm text-muted-foreground">
                 Before chatting, run through these — they resolve ~70% of macro tickets:
               </div>
@@ -118,14 +155,20 @@ export default function TicketPreview() {
                 ))}
               </div>
               <button onClick={() => setStarted(true)} className="btn-primary w-full">
-                Still having issues → start AI chat
+                Still having issues — start AI chat
               </button>
             </div>
           ) : (
             <>
               <div className="p-4 h-[420px] overflow-y-auto space-y-3 bg-background/30">
                 {messages.map((m) => (
-                  <div key={m.id} className={cn("flex gap-2.5", m.author === "user" ? "justify-end" : "justify-start")}>
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "flex gap-2.5",
+                      m.author === "user" ? "justify-end" : "justify-start",
+                    )}
+                  >
                     {m.author === "ai" && (
                       <div className="w-7 h-7 rounded-md bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
                         <Bot className="w-3.5 h-3.5 text-primary" />
@@ -133,10 +176,10 @@ export default function TicketPreview() {
                     )}
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-md px-3.5 py-2.5 text-sm leading-relaxed border",
+                        "max-w-[80%] rounded-md px-3.5 py-2.5 text-sm leading-relaxed border whitespace-pre-wrap",
                         m.author === "user"
                           ? "bg-secondary border-border"
-                          : "bg-primary/5 border-primary/30"
+                          : "bg-primary/5 border-primary/30",
                       )}
                     >
                       {m.content}
@@ -148,6 +191,16 @@ export default function TicketPreview() {
                     )}
                   </div>
                 ))}
+                {busy && (
+                  <div className="flex gap-2.5 justify-start">
+                    <div className="w-7 h-7 rounded-md bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                      <Bot className="w-3.5 h-3.5 text-primary animate-pulse" />
+                    </div>
+                    <div className="bg-primary/5 border border-primary/30 rounded-md px-3.5 py-2.5 text-sm text-muted-foreground">
+                      Reading your codebase…
+                    </div>
+                  </div>
+                )}
                 {escalated && (
                   <div className="flex items-center gap-2 text-xs font-mono text-accent border border-dashed border-accent/40 rounded-md p-3 bg-accent/5">
                     <Shield className="w-4 h-4" />
@@ -157,16 +210,21 @@ export default function TicketPreview() {
               </div>
 
               <form onSubmit={submit} className="p-4 border-t border-border flex items-end gap-2">
-                <button type="button" className="btn-ghost h-10 px-2.5" aria-label="Attach image">
+                <button
+                  type="button"
+                  className="btn-ghost h-10 px-2.5"
+                  aria-label="Attach image"
+                >
                   <ImageIcon className="w-4 h-4" />
                 </button>
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Describe your issue… (try /human to escalate)"
+                  placeholder={`Describe your issue… (try ${botConfig.escalateKeyword} to escalate)`}
                   className="input-base text-sm"
+                  disabled={busy}
                 />
-                <button type="submit" className="btn-primary h-10 py-0">
+                <button type="submit" disabled={busy} className="btn-primary h-10 py-0 disabled:opacity-50">
                   <Send className="w-4 h-4" />
                 </button>
               </form>
@@ -175,7 +233,7 @@ export default function TicketPreview() {
         </div>
 
         <div className="mt-4 text-center text-[11px] font-mono text-muted-foreground">
-          This is a preview of what your Discord members see when opening a ticket.
+          Live preview — uses your real AI provider, knowledge base and trained responses.
         </div>
       </div>
     </div>
