@@ -1,14 +1,5 @@
-# Welcome to your OnSpace project
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use OnSpace**
-
-Simply visit the [OnSpace Project]() and start prompting.
-
-Changes made via OnSpace will be committed automatically to this repo.
+An AI ticket tool designed for PsychoHatcher and AHKVault staff to automate troubleshooting tickets relating to macro issues,
+DEMO mode to display the functionality or adjust the code to suit your specific AI troubleshooting assistant to assist with tickets in your channel
 
 **Use your preferred IDE**
 
@@ -56,6 +47,4 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
 
-Simply open [OnSpace]() and click on Share -> Publish.
