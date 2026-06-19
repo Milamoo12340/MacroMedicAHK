@@ -1,5 +1,21 @@
-An AI ticket tool designed for PsychoHatcher and AHKVault staff to automate troubleshooting tickets relating to macro issues,
-DEMO mode to display the functionality or adjust the code to suit your specific AI troubleshooting assistant to assist with tickets in your channel
+**An AI ticket tool designed for PsychoHatcher and AHKVault staff to automate troubleshooting tickets relating to macro issues,
+DEMO mode to display the functionality or adjust the code to suit your specific AI troubleshooting assistant to assist with tickets in your channel**
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 **Use your preferred IDE**
 
